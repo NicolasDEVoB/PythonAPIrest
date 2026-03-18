@@ -4,7 +4,7 @@ API REST simples para gerenciamento de usuários, desenvolvida com FastAPI e SQL
 
 ## Tecnologias
 
-- Python
+- Python 3.10+
 - FastAPI
 - SQLite
 
@@ -12,7 +12,7 @@ API REST simples para gerenciamento de usuários, desenvolvida com FastAPI e SQL
 
 **1. Clone o repositório**
 ```bash
-git clone https://github.com/seu-usuario/seu-repositorio.git
+git clone https://github.com/NicolasDEVoB/PythonAPIrest.git
 cd seu-repositorio
 ```
 
