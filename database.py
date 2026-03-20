@@ -1,24 +1,48 @@
-import sqlite3
+import psycopg2
+from psycopg2.pool import SimpleConnectionPool
+from psycopg2.extras import RealDictCursor
+from contextlib import contextmanager
+from pprint import pprint
+from dotenv import load_dotenv
+import os
 
-DB = "banco.db"
 
+load_dotenv()
+
+DB_CONFIG = {
+    "host": os.getenv("DB_HOST"),
+    "database": os.getenv("DB_NAME"),
+    "user": os.getenv("DB_USER"),
+    "password": os.getenv("DB_PASSWORD"),
+    "port": os.getenv("DB_PORT")
+}
+
+pool = SimpleConnectionPool(minconn=1, maxconn=10, **DB_CONFIG)
+
+@contextmanager
 # Criar ou conectar um banco de dados
 def get_conn():
-    conn = sqlite3.connect(DB)
-    return conn, conn.cursor()
+    conn = pool.getconn()
+    try:
+        yield conn, conn.cursor(cursor_factory=RealDictCursor)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        pool.putconn(conn)
 
 
 # Criar tabela (se não existir ainda)
 def execute():
-    conn, cursor = get_conn()
-    cursor.execute("""
-CREATE TABLE IF NOT EXISTS usuarios (
-    user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome TEXT,
-    email TEXT
-)
-""")
-    conn.commit()
+    with get_conn() as (conn, cursor):
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS usuarios (
+                user_id SERIAL PRIMARY KEY,
+                nome TEXT,
+                email TEXT
+    )
+    """)
 
 
 execute()
@@ -26,41 +50,40 @@ execute()
 
 # Inserir dados (INSERT)
 def insert(name, email) -> None:
-    conn, cursor = get_conn()
-    cursor.execute("INSERT INTO usuarios (nome, email) VALUES (?, ?)",(name, email))
-    conn.commit()
+    with get_conn() as (conn, cursor):
+        cursor.execute(
+            "INSERT INTO usuarios (nome, email) VALUES (%s, %s)",
+            (name, email)
+        )
 
 
 # Buscar todos os dados
 def read_all() -> list[dict]:
-    conn, cursor = get_conn()
-    cursor.execute("SELECT * FROM usuarios")
-    rows = cursor.fetchall()
-    return [{"user_id": row[0], "nome": row[1], "email": row[2]} for row in rows]
+    with get_conn() as (conn, cursor):
+        cursor.execute("SELECT * FROM usuarios")
+        return cursor.fetchall()
 
 
 # Buscar dado específico (por id)
 def read(user_id: int) -> dict | None:
-    conn, cursor = get_conn()
-    cursor.execute("SELECT * FROM usuarios WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
-    if row is None:
-        return None
-    return {"user_id": row[0], "nome": row[1], "email": row[2]}
+    with get_conn() as (conn, cursor):
+        cursor.execute(
+            "SELECT * FROM usuarios WHERE user_id = %s", (user_id,)
+        )
+        return cursor.fetchone()  # já retorna dict ou None
 
 
-# Deleta um usuário pelo id
 def delete(user_id: int) -> None:
-    conn, cursor = get_conn()
-    cursor.execute("DELETE FROM usuarios WHERE user_id = ?",(user_id,))
-    conn.commit()
+    with get_conn() as (conn, cursor):
+        cursor.execute(
+            "DELETE FROM usuarios WHERE user_id = %s", (user_id,)
+        )
 
 
 # Atualiza usuário
 def update(user_id: int, name: str, email: str) -> None:
-    conn, cursor = get_conn()
-    cursor.execute(
-        "UPDATE usuarios SET nome = ?, email = ? WHERE user_id = ?",
-        (name, email, user_id)
-    )
-    conn.commit()
+    with get_conn() as (conn, cursor):
+        cursor.execute(
+            "UPDATE usuarios SET nome = %s, email = %s WHERE user_id = %s",
+            (name, email, user_id)
+        )
