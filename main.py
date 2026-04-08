@@ -9,10 +9,12 @@ app = FastAPI()
 def ler_tudo():
     return db.read_all()
 
+
 @app.post("/")
 def inserir(user: Usuario):
     db.insert(user.name, user.email)
     return {"message": "Usuário criado com sucesso!"}
+
 
 @app.get("/{user_id}")
 def buscar(user_id: int):
@@ -20,6 +22,7 @@ def buscar(user_id: int):
     if usuario is None:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     return usuario
+
 
 @app.put("/{user_id}")
 def atualizar(user_id: int, user: Usuario):
